@@ -82,25 +82,21 @@ const TailscaleDeviceItem = GObject.registerClass(
 
       this.connect('activate', () => onClick());
 
-      const clickAction = this._clickAction ?? (() => {
-        const action = new Clutter.ClickAction();
-        this.add_action(action);
-        action.connect('notify::pressed', () => {
-          if (action.pressed)
-            this.add_style_pseudo_class('active');
-          else
-            this.remove_style_pseudo_class('active');
-        });
-        action.connect('clicked', () => this.activate(Clutter.get_current_event()));
-        return action
-      })();
-      clickAction.connect('long-press', (_action, _actor, state) => {
-        if (state === Clutter.LongPressState.ACTIVATE) {
-          return onLongClick();
-        }
-        return true;
+      // GNOME 49 removed Clutter.ClickAction/TapAction. Use the new gesture
+      // framework (Clutter.ClickGesture / Clutter.LongPressGesture) instead.
+      const click = new Clutter.ClickGesture();
+      this.add_action(click);
+      click.connect('notify::pressed', () => {
+        if (click.pressed)
+          this.add_style_pseudo_class('active');
+        else
+          this.remove_style_pseudo_class('active');
       });
-      clickAction.enabled = true;
+      click.connect('recognize', () => this.activate(Clutter.get_current_event()));
+
+      const longPress = new Clutter.LongPressGesture();
+      this.add_action(longPress);
+      longPress.connect('recognize', () => onLongClick());
     }
 
     activate(event) {
@@ -313,9 +309,4 @@ export default class TailscaleExtension extends Extension {
     this._tailscale.destroy();
     this._tailscale = null;
   }
-}
-
-function init(meta) {
-  ExtensionUtils.initTranslations(Me.metadata.uuid);
-  return new TailscaleExtension(meta.uuid, Me.path);
 }
