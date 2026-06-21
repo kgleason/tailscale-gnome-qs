@@ -4,6 +4,7 @@ import Gio from "gi://Gio";
 import Soup from "gi://Soup?version=3.0";
 
 import { setTimeout } from "./timeout.js";
+import { nodesFromStatus, peersFromNetMap, prefsUpdateBody } from "./parsing.js";
 
 // tailscaled's local API socket lives at different paths depending on how
 // Tailscale was installed (standard package vs. snap). Use the first one
@@ -149,27 +150,7 @@ export const Tailscale = GObject.registerClass(
     }
 
     _process_nodes(prefs, peers) {
-      const nodes = peers
-        .map(peer => {
-          const node = {
-            id: peer.ID,
-            name: peer.DNSName.split(".")[0],
-            os: peer.OS,
-            exit_node: peer.ID == prefs.ExitNodeID,
-            exit_node_option: peer.ExitNodeOption,
-            online: peer.Online,
-            ips: peer.TailscaleIPs,
-            mullvad: peer.Tags?.includes("tag:mullvad-exit-node") || false,
-            location: peer.Location,
-          };
-          return node;
-        })
-        .sort((a, b) =>
-          (b.exit_node - a.exit_node)
-          || (b.online - a.online)
-          || (b.exit_node_option - a.exit_node_option)
-          || a.name.localeCompare(b.name)
-        );
+      const nodes = nodesFromStatus(prefs, peers);
 
       if (JSON.stringify(nodes) != JSON.stringify(this._nodes)) {
         this._nodes = nodes;
@@ -340,16 +321,7 @@ export const Tailscale = GObject.registerClass(
               should_update = true;
             }
             if (update.NetMap) {
-              this._peers = update.NetMap.Peers.map(peer => ({
-                ID: peer.StableID,
-                DNSName: peer.Name,
-                OS: peer.Hostinfo.OS,
-                ExitNodeOption: peer.AllowedIPs?.includes("0.0.0.0/0"),
-                Online: peer.Online,
-                TailscaleIPs: peer.Addresses.map(address => address.split("/")[0]),
-                Tags: peer.Tags,
-                Location: peer.Hostinfo.Location
-              }));
+              this._peers = peersFromNetMap(update.NetMap.Peers);
               should_update = true;
             }
             if (should_update) {
@@ -383,13 +355,7 @@ export const Tailscale = GObject.registerClass(
     }
 
     _update_prefs(prefs) {
-      const body = {
-        ...prefs,
-        ...Object.fromEntries(
-          Object.entries(prefs)
-            .map(([key, _]) => [`${key}set`, true]),
-        ),
-      }
+      const body = prefsUpdateBody(prefs);
       this._client.request("PATCH", "/localapi/v0/prefs", body)
         .then(
           (prefs) => {

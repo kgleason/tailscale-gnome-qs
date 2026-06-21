@@ -11,7 +11,8 @@ build:
 	gnome-extensions pack --force --podir=locale \
 	                      --extra-source=icons/ \
 	                      --extra-source=tailscale.js \
-	                      --extra-source=timeout.js; \
+	                      --extra-source=timeout.js \
+	                      --extra-source=parsing.js; \
 	mv $(EXTENSION_DIR).shell-extension.zip ../$(BUNDLE_PATH)
 
 install:
