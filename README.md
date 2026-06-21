@@ -6,8 +6,12 @@ Add Tailscale to the GNOME quick settings: toggle the connection, browse your
 nodes, pick an exit node, switch profiles, and flip common preferences without
 leaving the panel.
 
-Supports **GNOME Shell 45–50**, and both standard package and **snap**
+Supports **GNOME Shell 46–50**, and both standard package and **snap**
 installs of Tailscale (the tailscaled socket is detected automatically).
+
+> **Note:** This has only been tested on **GNOME 50 (Ubuntu 26.04)**. The
+> 46–50 range reflects the APIs used, but compatibility on 46–49 is unverified —
+> reports welcome.
 
 ##### BUILD (UBUNTU)
 
