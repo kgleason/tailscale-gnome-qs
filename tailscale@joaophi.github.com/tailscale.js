@@ -5,11 +5,19 @@ import Soup from "gi://Soup?version=3.0";
 
 import { setTimeout } from "./timeout.js";
 
+// tailscaled's local API socket lives at different paths depending on how
+// Tailscale was installed (standard package vs. snap). Use the first one
+// that actually exists.
+const SOCKET_PATHS = [
+  "/var/run/tailscale/tailscaled.sock",
+  "/var/snap/tailscale/common/socket/tailscaled.sock",
+];
+
 class TailscaleApiClient {
   constructor() {
-    const address = new Gio.UnixSocketAddress({
-      path: "/var/run/tailscale/tailscaled.sock",
-    });
+    const path = SOCKET_PATHS.find(p => Gio.File.new_for_path(p).query_exists(null))
+      ?? SOCKET_PATHS[0];
+    const address = new Gio.UnixSocketAddress({ path });
     this.session = new Soup.Session({
       "remote-connectable": address,
       "timeout": 0,
