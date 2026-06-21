@@ -133,17 +133,6 @@ const TailscaleProfileItem = GObject.registerClass(
   }
 );
 
-const PopupScrollableSubMenuMenuItem = GObject.registerClass(
-  class PopupScrollableSubMenuMenuItem extends PopupMenu.PopupSubMenuMenuItem {
-    _init(props) {
-      super._init(props);
-
-      this.menu._needsScrollbar = () => true;
-      this.menu.box.height = 200;
-    }
-  }
-);
-
 const TailscaleMenuToggle = GObject.registerClass(
   class TailscaleMenuToggle extends QuickSettings.QuickMenuToggle {
     _init(icon, tailscale) {
@@ -167,8 +156,22 @@ const TailscaleMenuToggle = GObject.registerClass(
       this.menu.setHeader(icon, this.title, tailscale.exit_node_name);
 
       // NODES
-      const mnodes = new PopupScrollableSubMenuMenuItem(_("Nodes"), false, {});
+      // The node list lives in a height-capped St.ScrollView so long lists
+      // scroll instead of overflowing the menu. The old PopupSubMenu-based
+      // scrolling (_needsScrollbar + box.height) stopped working on GNOME 49/50.
       const nodes = new PopupMenu.PopupMenuSection();
+      const scrollView = new St.ScrollView({
+        style_class: 'vfade',
+        hscrollbar_policy: St.PolicyType.NEVER,
+        vscrollbar_policy: St.PolicyType.AUTOMATIC,
+        x_expand: true,
+        y_expand: true,
+      });
+      scrollView.set_style('max-height: 300px;');
+      scrollView.add_child(nodes.actor);
+      const scrollItem = new PopupMenu.PopupBaseMenuItem({ reactive: false, can_focus: false });
+      scrollItem.style_class = '';
+      scrollItem.add_child(scrollView);
       const update_nodes = (obj) => {
         nodes.removeAll();
         const mullvad = new PopupMenu.PopupSubMenuMenuItem("Mullvad", false, {});
@@ -203,8 +206,7 @@ const TailscaleMenuToggle = GObject.registerClass(
       }
       tailscale.connect("notify::nodes", (obj) => update_nodes(obj));
       update_nodes(tailscale);
-      mnodes.menu.addMenuItem(nodes);
-      this.menu.addMenuItem(mnodes);
+      this.menu.addMenuItem(scrollItem);
 
       // SEPARATOR
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
