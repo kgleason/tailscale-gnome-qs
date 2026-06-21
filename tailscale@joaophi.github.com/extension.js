@@ -25,6 +25,7 @@ import St from "gi://St";
 import { Extension, gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
 
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import * as MessageTray from "resource:///org/gnome/shell/ui/messageTray.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import * as QuickSettings from "resource:///org/gnome/shell/ui/quickSettings.js";
 
@@ -33,6 +34,25 @@ const QuickSettingsMenu = Main.panel.statusArea.quickSettings;
 
 import { Tailscale } from "./tailscale.js";
 import { clearInterval, clearSources, setInterval } from "./timeout.js";
+
+// A single reusable notification source for the transient "IP copied" banners.
+let notifySource = null;
+
+function notifyCopied(gicon, name, ip) {
+  if (!notifySource) {
+    notifySource = new MessageTray.Source({ title: "Tailscale", icon: gicon });
+    notifySource.connect("destroy", () => { notifySource = null; });
+    Main.messageTray.add(notifySource);
+  }
+  const notification = new MessageTray.Notification({
+    source: notifySource,
+    title: _("IP address copied"),
+    body: `${name} (${ip})`,
+    gicon,
+    isTransient: true,
+  });
+  notifySource.addNotification(notification);
+}
 
 const TailscaleIndicator = GObject.registerClass(
   class TailscaleIndicator extends QuickSettings.SystemIndicator {
@@ -192,7 +212,7 @@ const TailscaleMenuToggle = GObject.registerClass(
 
             St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, node.ips[0]);
             St.Clipboard.get_default().set_text(St.ClipboardType.PRIMARY, node.ips[0]);
-            Main.osdWindowManager.show(-1, icon, _("IP address has been copied to the clipboard"));
+            notifyCopied(icon, node.name, node.ips[0]);
             return true;
           };
 
@@ -296,5 +316,10 @@ export default class TailscaleExtension extends Extension {
 
     this._tailscale.destroy();
     this._tailscale = null;
+
+    if (notifySource) {
+      notifySource.destroy();
+      notifySource = null;
+    }
   }
 }
