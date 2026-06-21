@@ -153,6 +153,22 @@ const TailscaleProfileItem = GObject.registerClass(
   }
 );
 
+const PopupScrollableSubMenuMenuItem = GObject.registerClass(
+  class PopupScrollableSubMenuMenuItem extends PopupMenu.PopupSubMenuMenuItem {
+    _init(text) {
+      super._init(text);
+
+      // Cap the submenu's scroll view height and force a vertical scrollbar so
+      // long node lists scroll instead of growing past the bottom of the
+      // screen. Capping the scroll view (not box.height, the old approach) is
+      // what actually produces overflow to scroll on GNOME 49/50.
+      this.menu.actor.set_style('max-height: 300px;');
+      this.menu.actor.vscrollbar_policy = St.PolicyType.AUTOMATIC;
+      this.menu._needsScrollbar = () => true;
+    }
+  }
+);
+
 const TailscaleMenuToggle = GObject.registerClass(
   class TailscaleMenuToggle extends QuickSettings.QuickMenuToggle {
     _init(icon, tailscale) {
@@ -176,22 +192,10 @@ const TailscaleMenuToggle = GObject.registerClass(
       this.menu.setHeader(icon, this.title, tailscale.exit_node_name);
 
       // NODES
-      // The node list lives in a height-capped St.ScrollView so long lists
-      // scroll instead of overflowing the menu. The old PopupSubMenu-based
-      // scrolling (_needsScrollbar + box.height) stopped working on GNOME 49/50.
+      // Collapsible submenu whose scroll view is height-capped so long node
+      // lists scroll instead of overflowing the menu.
+      const mnodes = new PopupScrollableSubMenuMenuItem(_("Nodes"));
       const nodes = new PopupMenu.PopupMenuSection();
-      const scrollView = new St.ScrollView({
-        style_class: 'vfade',
-        hscrollbar_policy: St.PolicyType.NEVER,
-        vscrollbar_policy: St.PolicyType.AUTOMATIC,
-        x_expand: true,
-        y_expand: true,
-      });
-      scrollView.set_style('max-height: 300px;');
-      scrollView.add_child(nodes.actor);
-      const scrollItem = new PopupMenu.PopupBaseMenuItem({ reactive: false, can_focus: false });
-      scrollItem.style_class = '';
-      scrollItem.add_child(scrollView);
       const update_nodes = (obj) => {
         nodes.removeAll();
         const mullvad = new PopupMenu.PopupSubMenuMenuItem("Mullvad", false, {});
@@ -226,7 +230,8 @@ const TailscaleMenuToggle = GObject.registerClass(
       }
       tailscale.connect("notify::nodes", (obj) => update_nodes(obj));
       update_nodes(tailscale);
-      this.menu.addMenuItem(scrollItem);
+      mnodes.menu.addMenuItem(nodes);
+      this.menu.addMenuItem(mnodes);
 
       // SEPARATOR
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
