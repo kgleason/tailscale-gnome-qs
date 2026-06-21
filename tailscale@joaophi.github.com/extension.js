@@ -57,9 +57,9 @@ const TailscaleIndicator = GObject.registerClass(
 
 const TailscaleDeviceItem = GObject.registerClass(
   class TailscaleDeviceItem extends PopupMenu.PopupBaseMenuItem {
-    _init(icon_name, text, subtitle, onClick, onLongClick) {
+    _init(icon_name, text, subtitle, onClick, onSecondaryClick) {
       super._init({
-        activate: onClick,
+        activate: !!onClick,
       });
 
       const icon = new St.Icon({
@@ -80,35 +80,21 @@ const TailscaleDeviceItem = GObject.registerClass(
       this.add_child(sub);
       sub.text = subtitle;
 
-      this.connect('activate', () => onClick());
+      if (onClick)
+        this.connect('activate', () => onClick());
 
-      // GNOME 49 removed Clutter.ClickAction/TapAction. Use the new gesture
-      // framework (Clutter.ClickGesture / Clutter.LongPressGesture) instead.
-      const click = new Clutter.ClickGesture();
-      this.add_action(click);
-      click.connect('notify::pressed', () => {
-        if (click.pressed)
-          this.add_style_pseudo_class('active');
-        else
-          this.remove_style_pseudo_class('active');
+      // Right-click (secondary button) copies the node's IP. Handled via the
+      // button-press-event signal so it coexists with the item's normal
+      // left-click activation. Replaces the old Clutter.ClickAction long-press,
+      // which was removed in GNOME 49 and never worked once ported to gestures.
+      this.connect('button-press-event', (_actor, event) => {
+        if (event.get_button() === Clutter.BUTTON_SECONDARY) {
+          onSecondaryClick();
+          return Clutter.EVENT_STOP;
+        }
+        return Clutter.EVENT_PROPAGATE;
       });
-      click.connect('recognize', () => this.activate(Clutter.get_current_event()));
-
-      const longPress = new Clutter.LongPressGesture();
-      this.add_action(longPress);
-      longPress.connect('recognize', () => onLongClick());
     }
-
-    activate(event) {
-      if (this._activatable)
-        this.emit('activate', event);
-    }
-
-    vfunc_button_press_event() { }
-
-    vfunc_button_release_event() { }
-
-    vfunc_touch_event(touchEvent) { }
   }
 );
 
@@ -197,7 +183,7 @@ const TailscaleMenuToggle = GObject.registerClass(
                 : "computer-symbolic"));
           const subtitle = node.exit_node ? _("disable exit node") : (node.exit_node_option ? _("use as exit node") : "");
           const onClick = node.exit_node_option ? () => { tailscale.exit_node = node.exit_node ? "" : node.id; } : null;
-          const onLongClick = () => {
+          const onSecondaryClick = () => {
             if (!node.ips)
               return false;
 
@@ -207,7 +193,7 @@ const TailscaleMenuToggle = GObject.registerClass(
             return true;
           };
 
-          menu.addMenuItem(new TailscaleDeviceItem(device_icon, node.name, subtitle, onClick, onLongClick));
+          menu.addMenuItem(new TailscaleDeviceItem(device_icon, node.name, subtitle, onClick, onSecondaryClick));
         }
         if (mullvad.menu.isEmpty()) {
           mullvad.destroy();
