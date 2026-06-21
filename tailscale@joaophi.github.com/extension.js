@@ -33,7 +33,7 @@ import * as QuickSettings from "resource:///org/gnome/shell/ui/quickSettings.js"
 const QuickSettingsMenu = Main.panel.statusArea.quickSettings;
 
 import { Tailscale } from "./tailscale.js";
-import { clearInterval, clearSources, setInterval } from "./timeout.js";
+import { clearSources } from "./timeout.js";
 
 // A single reusable notification source for the transient "IP copied" banners.
 let notifySource = null;
@@ -173,7 +173,6 @@ const TailscaleMenuToggle = GObject.registerClass(
   class TailscaleMenuToggle extends QuickSettings.QuickMenuToggle {
     _init(icon, tailscale) {
       super._init({
-        label: "Tailscale",
         gicon: icon,
         toggleMode: true,
         menuEnabled: true,
@@ -290,24 +289,8 @@ export default class TailscaleExtension extends Extension {
     this._tailscale = new Tailscale();
     this._indicator = new TailscaleIndicator(icon, this._tailscale);
     this._menu = new TailscaleMenuToggle(icon, this._tailscale);
-    if (QuickSettingsMenu.addExternalIndicator) {
-      this._indicator.quickSettingsItems.push(this._menu);
-      QuickSettingsMenu.addExternalIndicator(this._indicator);
-    } else {
-      const timerHandle = setInterval(() => {
-        if (!QuickSettingsMenu._indicators.get_first_child())
-          return;
-
-        QuickSettingsMenu._indicators.insert_child_at_index(this._indicator, 0);
-        QuickSettingsMenu._addItems([this._menu]);
-        QuickSettingsMenu.menu._grid.set_child_below_sibling(
-          this._menu,
-          QuickSettingsMenu._backgroundApps.quickSettingsItems[0]
-        );
-
-        clearInterval(timerHandle);
-      }, 100);
-    }
+    this._indicator.quickSettingsItems.push(this._menu);
+    QuickSettingsMenu.addExternalIndicator(this._indicator);
   }
 
   disable() {
